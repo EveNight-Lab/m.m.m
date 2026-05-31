@@ -1,0 +1,12 @@
+{
+  "name": "나만의 몬스터 생성기",
+  "short_name": "나몬생",
+  "description": "나만의 몬스터를 만들고 키우는 재미있는 게임! 나몬생에서 나만의 특별한 몬스터를 만들어보세요 🎮✨",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": []
+}
+

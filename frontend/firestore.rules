@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 사용자 프로필 컬렉션
+    match /userProfiles/{userId} {
+      // 읽기: 인증된 사용자는 모든 프로필을 읽을 수 있음 (친구 검색을 위해)
+      allow read: if request.auth != null;
+      
+      // 생성: 인증된 사용자가 자신의 uid로만 생성 가능
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // 수정: 본인의 프로필만 수정 가능
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // 삭제: 본인의 프로필만 삭제 가능
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 친구 요청 컬렉션
+    match /friendRequests/{requestId} {
+      // 읽기: 본인이 보낸 요청 또는 받은 요청만 읽을 수 있음
+      allow read: if request.auth != null && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+      
+      // 생성: 인증된 사용자가 자신이 보낸 요청만 생성 가능
+      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
+      
+      // 수정: 받은 요청의 경우에만 수정 가능 (승인/거절)
+      allow update: if request.auth != null && 
+        resource.data.toUserId == request.auth.uid &&
+        resource.data.status == 'pending';
+      
+      // 삭제: 본인이 보낸 요청 또는 받은 요청만 삭제 가능
+      allow delete: if request.auth != null && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+    }
+    
+    // 친구 관계 컬렉션
+    match /friends/{friendId} {
+      // 읽기: 본인이 포함된 친구 관계만 읽을 수 있음
+      allow read: if request.auth != null && (
+        resource.data.userId1 == request.auth.uid ||
+        resource.data.userId2 == request.auth.uid
+      );
+      
+      // 생성: 인증된 사용자가 자신이 포함된 관계만 생성 가능
+      allow create: if request.auth != null && (
+        request.resource.data.userId1 == request.auth.uid ||
+        request.resource.data.userId2 == request.auth.uid
+      );
+      
+      // 수정: 본인이 포함된 관계만 수정 가능
+      allow update: if request.auth != null && (
+        resource.data.userId1 == request.auth.uid ||
+        resource.data.userId2 == request.auth.uid
+      );
+      
+      // 삭제: 본인이 포함된 관계만 삭제 가능
+      allow delete: if request.auth != null && (
+        resource.data.userId1 == request.auth.uid ||
+        resource.data.userId2 == request.auth.uid
+      );
+    }
+    
+    // 캐릭터 컬렉션
+    match /characters/{characterId} {
+      // 읽기: 인증된 사용자는 모든 캐릭터를 읽을 수 있음 (전투를 위해)
+      allow read: if request.auth != null;
+      
+      // 생성: 인증된 사용자가 자신의 userId로만 생성 가능
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      
+      // 수정: 본인의 데이터만 수정 가능
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // 삭제: 본인의 데이터만 삭제 가능
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // 이미지 컬렉션 (데이터 분석용, 캐릭터 삭제 시에도 유지)
+    match /images/{imageId} {
+      // 읽기: 인증된 사용자는 모두 읽을 수 있음 (데이터 분석용)
+      allow read: if request.auth != null;
+      
+      // 생성: 백엔드에서만 생성 (Admin SDK 사용)
+      allow create: if false;
+      
+      // 수정: 백엔드에서만 수정 (Admin SDK 사용)
+      allow update: if false;
+      
+      // 삭제: 백엔드에서만 삭제 (Admin SDK 사용)
+      allow delete: if false;
+    }
+  }
+}
+

@@ -1,0 +1,406 @@
+@import "tailwindcss";
+
+/* PWA 설치 프롬프트 애니메이션 */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* 전투 애니메이션 - 물리적 움직임 */
+
+/* 데미지 숫자 떠오르기 */
+@keyframes damageFloat {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(-20px) scale(1.3);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(-40px) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(-80px) scale(0.9);
+  }
+}
+
+/* 공격: 앞으로 다가가기 (플레이어) */
+@keyframes attackForward {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+  50% {
+    transform: translateX(60px) scale(1.1);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 공격: 앞으로 다가가기 (적, 반대 방향) */
+@keyframes attackForwardReverse {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+  50% {
+    transform: translateX(-60px) scale(1.1);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 명중: 공격 성공 시 흔들림 */
+@keyframes hitShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px) rotate(-2deg);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px) rotate(2deg);
+  }
+}
+
+/* 회피: 빠르게 뒤로 이동 (플레이어) */
+@keyframes dodgeBack {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-40px) scale(0.95);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 회피: 빠르게 뒤로 이동 (적, 반대 방향) */
+@keyframes dodgeBackReverse {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(40px) scale(0.95);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 데미지 받음: 강한 떨림 */
+@keyframes damageShake {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  5%, 15%, 25%, 35%, 45% {
+    transform: translateX(-8px) translateY(-3px) rotate(-3deg);
+  }
+  10%, 20%, 30%, 40%, 50% {
+    transform: translateX(8px) translateY(3px) rotate(3deg);
+  }
+}
+
+/* Shimmer effect for rolling dice */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Fade in scale animation */
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.4s ease-out forwards;
+}
+
+/* Fade in up animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+/* 방어 성공: 밀어내기 (플레이어) */
+@keyframes defendPush {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-30px) scale(1.05);
+  }
+  60% {
+    transform: translateX(-15px) scale(1.02);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 방어 성공: 밀어내기 (적, 반대 방향) */
+@keyframes defendPushReverse {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(30px) scale(1.05);
+  }
+  60% {
+    transform: translateX(15px) scale(1.02);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 애니메이션 클래스 */
+.animate-attack-forward {
+  animation: attackForward 0.3s ease-out;
+}
+
+.animate-attack-forward-reverse {
+  animation: attackForwardReverse 0.3s ease-out;
+}
+
+.animate-hit-shake {
+  animation: hitShake 0.4s ease-out;
+}
+
+.animate-dodge-back {
+  animation: dodgeBack 0.4s ease-out;
+}
+
+.animate-dodge-back-reverse {
+  animation: dodgeBackReverse 0.4s ease-out;
+}
+
+.animate-damage-shake {
+  animation: damageShake 0.5s ease-out;
+}
+
+.animate-defend-push {
+  animation: defendPush 0.6s ease-out;
+}
+
+.animate-defend-push-reverse {
+  animation: defendPushReverse 0.6s ease-out;
+}
+
+/* 모바일 앱 스타일 */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  position: fixed;
+  touch-action: pan-y;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 기능적 UI 요소 보호: 글자 크기 변경 시에도 고정 크기 유지 */
+
+/* 탭 바는 항상 고정 크기 (하단 네비게이션) - 인라인 스타일로 더 강력하게 보호 */
+nav[class*="fixed"][class*="bottom"],
+nav[class*="bottom-0"] {
+  font-size: 14px !important; /* 14px 고정 (rem 무시) */
+}
+
+nav[class*="fixed"][class*="bottom"] *,
+nav[class*="bottom-0"] * {
+  font-size: inherit !important; /* 부모의 고정 크기 상속 */
+}
+
+/* 버튼 텍스트 크기 제한 (기능적 UI 보호) */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"] {
+  font-size: clamp(0.75rem, 0.875rem, 1rem) !important; /* 최소 12px, 최대 16px */
+}
+
+/* 입력 요소 보호 */
+input[type="range"],
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+  font-size: clamp(0.875rem, 1rem, 1rem) !important; /* 최소 14px, 최대 16px */
+}
+
+/* 작은 버튼 텍스트는 더 작게 제한 (예: text-[9px] 같은 경우) */
+button[class*="text-\["],
+button[class*="text-xs"] {
+  font-size: clamp(0.5625rem, 0.75rem, 0.875rem) !important; /* 최소 9px, 최대 14px */
+}
+
+body {
+  background: radial-gradient(circle at 20% 20%, rgba(125, 211, 252, 0.12), transparent 25%),
+    radial-gradient(circle at 80% 10%, rgba(192, 132, 252, 0.18), transparent 28%),
+    radial-gradient(circle at 40% 75%, rgba(125, 211, 252, 0.12), transparent 25%),
+    #050816;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh; /* 동적 뷰포트 높이 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 스크롤바 숨기기 (모바일) */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+/* 가로 스크롤 영역 스크롤바 숨기기 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 우주 배경 및 별 효과 */
+.cosmic-bg {
+  position: relative;
+  isolation: isolate;
+}
+
+.cosmic-bg::before,
+.cosmic-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.cosmic-bg::before {
+  background: radial-gradient(circle at 30% 30%, rgba(124, 58, 237, 0.2), transparent 35%),
+    radial-gradient(circle at 70% 40%, rgba(14, 165, 233, 0.2), transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(59, 130, 246, 0.12), transparent 45%);
+  filter: blur(40px);
+}
+
+.cosmic-bg::after {
+  background:
+    radial-gradient(1px 1px at 20% 20%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 60% 30%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 80% 70%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 35% 80%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.2px 1.2px at 10% 60%, rgba(255, 255, 255, 0.8), transparent);
+  animation: twinkle 6s ease-in-out infinite alternate;
+  opacity: 0.7;
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.4; transform: translate3d(0, 0, 0) scale(1); }
+  100% { opacity: 0.9; transform: translate3d(-0.5%, -0.5%, 0) scale(1.02); }
+}
+
+/* 글로우 & 그라데이션 텍스트 */
+.cosmic-title {
+  background: linear-gradient(90deg, #7dd3fc, #c084fc, #7dd3fc);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: hueShift 8s ease-in-out infinite;
+}
+
+@keyframes hueShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 주사위 팝업 애니메이션 */
+@keyframes dicePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-180deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* 페이드 인 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

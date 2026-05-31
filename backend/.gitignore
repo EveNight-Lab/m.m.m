@@ -1,0 +1,16 @@
+# 환경 변수 파일 (API 키 포함)
+.env
+
+# Firebase 서비스 계정 키 파일
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# Node modules
+node_modules/
+
+# 로그 파일
+*.log
+
+# OS 파일
+.DS_Store
+Thumbs.db
