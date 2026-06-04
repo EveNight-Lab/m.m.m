@@ -5,10 +5,11 @@ import Card from '../components/Card'
 import FormField from '../components/FormField'
 import WorldViewSelector from '../components/WorldViewSelector'
 import { useAuth } from '../contexts/AuthContext'
-import { getApiUrl } from '../utils/api'
 import type { WorldView } from '../constants/worldViews'
 import { MONSTER_CLASSIFICATIONS, MONSTER_JOBS } from '../constants/monsterTypes'
 import type { MonsterClassification, MonsterJob } from '../constants/monsterTypes'
+import { generateCharacterFirst } from '../services/characterService'
+import { saveCharacter } from '../utils/characters'
 
 function CreateFirst() {
   const navigate = useNavigate()
@@ -59,40 +60,17 @@ function CreateFirst() {
         throw new Error('로그인이 필요합니다.')
       }
 
-      const idToken = await currentUser.getIdToken()
-
-      // 전송할 데이터 준비
-      const requestData = {
-        name: name.trim(),
+      // 1차 생성 서비스 호출
+      const generatedChar = await generateCharacterFirst(
+        name.trim(),
         worldView,
         classification,
         job,
-      }
+        null // 템플릿 이미지 URL은 1차에서는 null
+      )
 
-      // 디버깅: 전송할 데이터 로그
-      console.log('📤 [1차 생성] 전송할 데이터:', {
-        name: requestData.name,
-        worldView: requestData.worldView,
-        classification: requestData.classification,
-        job: requestData.job,
-        worldViewType: typeof requestData.worldView,
-        worldViewLength: requestData.worldView?.length,
-      })
-
-      // 1차 생성 API 호출 (이미지 없이)
-      const response = await fetch(getApiUrl('/api/ai/generate-character-first'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify(requestData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || '캐릭터 생성 실패')
-      }
+      // 로컬/원격 데이터베이스에 저장
+      await saveCharacter(currentUser.uid, generatedChar)
 
       // 성공 시 관리 탭으로 이동
       navigate('/manage')

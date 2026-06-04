@@ -50,8 +50,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const [userNickname, setUserNickname] = useState<string | null>(null)
 
+  // 모크 모드 활성화 여부 확인
+  const checkIsMockMode = () => {
+    const useMock = localStorage.getItem('mmm_use_mock')
+    if (useMock === 'false') {
+      return false
+    }
+    return true
+  }
+
   // 회원가입 (닉네임 + 비밀번호)
   async function signup(nickname: string, password: string) {
+    const isMock = checkIsMockMode()
+    const trimmedNickname = nickname.trim()
+
+    if (isMock) {
+      // 로컬 스토리지 기반 가짜 회원가입
+      const { checkNicknameExists, saveLocalUserProfile } = await import('../utils/mockDataService')
+      
+      if (checkNicknameExists(trimmedNickname)) {
+        throw new Error('이미 사용 중인 닉네임입니다.')
+      }
+      
+      if (password.length < 6) {
+        throw new Error('비밀번호는 6자 이상이어야 합니다.')
+      }
+
+      const uid = 'mock_user_' + Date.now()
+      const fakeUser = {
+        uid,
+        displayName: trimmedNickname,
+        email: nicknameToEmail(trimmedNickname),
+        getIdToken: async () => 'mock-id-token-xyz'
+      } as unknown as User
+
+      // 로컬 프로필 저장
+      saveLocalUserProfile(uid, trimmedNickname)
+      
+      // 세션 유지용 로컬스토리지 저장
+      localStorage.setItem('mmm_fake_user', JSON.stringify({
+        uid,
+        displayName: trimmedNickname,
+        email: fakeUser.email
+      }))
+
+      setCurrentUser(fakeUser)
+      setUserNickname(trimmedNickname)
+      return
+    }
+
     const email = nicknameToEmail(nickname)
     
     try {
@@ -91,6 +138,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 로그인 (닉네임 + 비밀번호)
   async function login(nickname: string, password: string) {
+    const isMock = checkIsMockMode()
+    const trimmedNickname = nickname.trim()
+
+    if (isMock) {
+      // 로컬 스토리지 기반 가짜 로그인
+      const { searchLocalUsersByNickname } = await import('../utils/mockDataService')
+      // 검색 시 자신을 제외하므로 더미 닉네임 일치를 위해 전체 스토리지 확인
+      const profiles = JSON.parse(localStorage.getItem('mmm_user_profiles') || '{}')
+      const profile = Object.values(profiles).find((p: any) => p.nickname.toLowerCase() === trimmedNickname.toLowerCase()) as any
+      
+      if (!profile) {
+        throw new Error('존재하지 않는 닉네임입니다.')
+      }
+
+      const fakeUser = {
+        uid: profile.userId,
+        displayName: profile.nickname,
+        email: nicknameToEmail(profile.nickname),
+        getIdToken: async () => 'mock-id-token-xyz'
+      } as unknown as User
+
+      // 세션 유지용 로컬스토리지 저장
+      localStorage.setItem('mmm_fake_user', JSON.stringify({
+        uid: profile.userId,
+        displayName: profile.nickname,
+        email: fakeUser.email
+      }))
+
+      setCurrentUser(fakeUser)
+      setUserNickname(profile.nickname)
+      return
+    }
+
     const email = nicknameToEmail(nickname)
     
     try {
@@ -114,6 +194,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 로그아웃
   async function logout() {
+    const isMock = checkIsMockMode()
+    
+    if (isMock) {
+      localStorage.removeItem('mmm_fake_user')
+      setCurrentUser(null)
+      setUserNickname(null)
+      return
+    }
+
     await signOut(auth)
     setUserNickname(null)
   }
@@ -122,6 +211,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (!currentUser) {
       setUserNickname(null)
+      return
+    }
+
+    // 모크 사용자인 경우 추가 DB 로드 스킵
+    if (currentUser.uid.startsWith('mock_')) {
+      setUserNickname(currentUser.displayName || null)
       return
     }
 
@@ -156,6 +251,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 인증 상태 변화 감지
   useEffect(() => {
+    const isMock = checkIsMockMode()
+
+    if (isMock) {
+      // 로컬스토리지에 저장된 가짜 유저 세션 확인
+      const savedUserStr = localStorage.getItem('mmm_fake_user')
+      if (savedUserStr) {
+        try {
+          const saved = JSON.parse(savedUserStr)
+          const fakeUser = {
+            uid: saved.uid,
+            displayName: saved.displayName,
+            email: saved.email,
+            getIdToken: async () => 'mock-id-token-xyz'
+          } as unknown as User
+          
+          setCurrentUser(fakeUser)
+          setUserNickname(saved.displayName)
+        } catch (e) {
+          console.error('가짜 유저 세션 복구 실패:', e)
+        }
+      }
+      setLoading(false)
+      return
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user)
       setLoading(false)

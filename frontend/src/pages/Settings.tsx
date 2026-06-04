@@ -13,6 +13,27 @@ function Settings() {
   const { fontSize, setFontSize, resetFontSize, minFontSize, maxFontSize, defaultFontSize } = useFontSize()
   const [localFontSize, setLocalFontSize] = useState(fontSize)
   
+  // 데모 설정 관련 상태
+  const [useMock, setUseMock] = useState(() => {
+    return localStorage.getItem('mmm_use_mock') !== 'false' // 기본값은 true (Mock 모드)
+  })
+  const [geminiKey, setGeminiKey] = useState(() => {
+    return localStorage.getItem('mmm_gemini_api_key') || ''
+  })
+  const [isKeyVisible, setIsKeyVisible] = useState(false)
+  const [settingsMessage, setSettingsMessage] = useState('')
+
+  const handleSaveDemoSettings = () => {
+    localStorage.setItem('mmm_use_mock', useMock ? 'true' : 'false')
+    if (geminiKey.trim()) {
+      localStorage.setItem('mmm_gemini_api_key', geminiKey.trim())
+    } else {
+      localStorage.removeItem('mmm_gemini_api_key')
+    }
+    setSettingsMessage('✅ 설정이 저장되었습니다.')
+    setTimeout(() => setSettingsMessage(''), 3000)
+  }
+
   // 템플릿 이미지 생성 관련 상태
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -606,11 +627,80 @@ function Settings() {
                   background: `linear-gradient(to right, rgb(34, 211, 238) 0%, rgb(34, 211, 238) ${((localFontSize - minFontSize) / (maxFontSize - minFontSize)) * 100}%, rgba(255,255,255,0.1) ${((localFontSize - minFontSize) / (maxFontSize - minFontSize)) * 100}%, rgba(255,255,255,0.1) 100%)`
                 }}
               />
-              <div className="flex justify-between text-xs text-gray-400">
-                <span>작게 ({minFontSize}px)</span>
-                <span>기본 ({defaultFontSize}px)</span>
-                <span>크게 ({maxFontSize}px)</span>
+            </div>
+          </div>
+
+          {/* 포트폴리오 데모 실행 및 API 설정 */}
+          <div className="pt-4 border-t border-white/10">
+            <h3 className="text-base font-semibold text-white mb-3">데모 실행 및 API 설정</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">실행 모드</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUseMock(true)}
+                    className={`p-3 rounded-lg border text-sm font-semibold transition-all ${
+                      useMock
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                        : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                    }`}
+                  >
+                    Mock 모드 (오프라인 더미)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseMock(false)}
+                    className={`p-3 rounded-lg border text-sm font-semibold transition-all ${
+                      !useMock
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                        : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                    }`}
+                  >
+                    Live 모드 (Gemini API)
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Mock 모드는 별도의 API Key 설정 없이 로컬 오프라인 데이터로 구동됩니다.
+                </p>
               </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1.5">Gemini API Key</label>
+                <div className="relative">
+                  <input
+                    type={isKeyVisible ? 'text' : 'password'}
+                    value={geminiKey}
+                    onChange={(e) => setGeminiKey(e.target.value)}
+                    placeholder="AI 캐릭터 생성을 위해 API Key를 입력하세요"
+                    className="w-full p-3 pr-10 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsKeyVisible(!isKeyVisible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs transition-colors"
+                  >
+                    {isKeyVisible ? '숨기기' : '보기'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                  API Key는 서버로 전송되지 않으며, 오직 브라우저 LocalStorage에만 안전하게 보관됩니다. Key가 등록되면 Live 모드에서 실시간 AI 생성을 사용할 수 있습니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveDemoSettings}
+                className="w-full p-3 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-300 font-semibold transition-all duration-200"
+              >
+                데모 설정 저장
+              </button>
+
+              {settingsMessage && (
+                <p className="text-center text-xs text-green-400 transition-opacity duration-300">
+                  {settingsMessage}
+                </p>
+              )}
             </div>
           </div>
 

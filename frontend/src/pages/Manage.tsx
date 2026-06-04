@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getUserCharacters, updateCharacter, deleteCharacter } from '../utils/characters'
 import { getApiUrl } from '../utils/api'
 import type { Character } from '../types'
+import { checkIsMockMode } from '../services/characterService'
 
 const SLOT_COUNT = 5 // 미계약/계약 슬롯 각각 5개
 
@@ -70,10 +71,15 @@ function Manage() {
 
     setIsLoadingTemplates(true)
     try {
+      if (checkIsMockMode()) {
+        const { getFallbackTemplatesByWorldView } = await import('../constants/fallbackTemplates')
+        const localTemplates = getFallbackTemplatesByWorldView(character.worldView)
+        setTemplates(localTemplates.slice(0, 3))
+        return
+      }
+
       const idToken = await currentUser.getIdToken()
       const params = new URLSearchParams({ worldView: character.worldView })
-      // classification과 job은 character에서 가져올 수 없으므로 생략
-      // 대신 worldView만으로 필터링
 
       const response = await fetch(getApiUrl(`/api/images/templates?${params.toString()}`), {
         method: 'GET',
@@ -87,12 +93,18 @@ function Manage() {
       }
 
       const data = await response.json()
-      // 최대 3개만 선택
       const selectedTemplates = (data.templates || []).slice(0, 3)
-      setTemplates(selectedTemplates)
+      
+      if (selectedTemplates.length === 0) {
+        const { getFallbackTemplatesByWorldView } = await import('../constants/fallbackTemplates')
+        setTemplates(getFallbackTemplatesByWorldView(character.worldView).slice(0, 3))
+      } else {
+        setTemplates(selectedTemplates)
+      }
     } catch (error) {
-      console.error('템플릿 로드 오류:', error)
-      setTemplates([])
+      console.error('템플릿 로드 오류, 로컬 대체 템플릿 사용:', error)
+      const { getFallbackTemplatesByWorldView } = await import('../constants/fallbackTemplates')
+      setTemplates(getFallbackTemplatesByWorldView(character.worldView).slice(0, 3))
     } finally {
       setIsLoadingTemplates(false)
     }

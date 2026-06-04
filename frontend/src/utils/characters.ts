@@ -16,11 +16,17 @@ import {
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import type { Character } from '../types'
+import { checkIsMockMode } from '../services/characterService'
 
 /**
  * 사용자의 캐릭터 목록 가져오기
  */
 export async function getUserCharacters(userId: string): Promise<Character[]> {
+  if (checkIsMockMode()) {
+    const { getLocalUserCharacters } = await import('./mockDataService')
+    return getLocalUserCharacters(userId)
+  }
+
   try {
     const charactersRef = collection(db, 'characters')
     const q = query(
@@ -45,6 +51,11 @@ export async function getUserCharacters(userId: string): Promise<Character[]> {
  * 캐릭터 저장
  */
 export async function saveCharacter(userId: string, character: Omit<Character, 'id'>): Promise<string> {
+  if (checkIsMockMode()) {
+    const { saveLocalCharacter } = await import('./mockDataService')
+    return saveLocalCharacter(userId, character)
+  }
+
   try {
     const charactersRef = collection(db, 'characters')
     const docRef = await addDoc(charactersRef, {
@@ -64,6 +75,11 @@ export async function saveCharacter(userId: string, character: Omit<Character, '
  * 캐릭터 업데이트
  */
 export async function updateCharacter(userId: string, characterId: string, updates: Partial<Character>): Promise<void> {
+  if (checkIsMockMode()) {
+    const { updateLocalCharacter } = await import('./mockDataService')
+    return updateLocalCharacter(userId, characterId, updates)
+  }
+
   try {
     const characterRef = doc(db, 'characters', characterId)
     await updateDoc(characterRef, {
@@ -80,6 +96,11 @@ export async function updateCharacter(userId: string, characterId: string, updat
  * 캐릭터 삭제
  */
 export async function deleteCharacter(userId: string, characterId: string): Promise<void> {
+  if (checkIsMockMode()) {
+    const { deleteLocalCharacter } = await import('./mockDataService')
+    return deleteLocalCharacter(userId, characterId)
+  }
+
   try {
     const characterRef = doc(db, 'characters', characterId)
     await deleteDoc(characterRef)
@@ -88,4 +109,5 @@ export async function deleteCharacter(userId: string, characterId: string): Prom
     throw error
   }
 }
+
 

@@ -6,8 +6,8 @@ import FormField from '../components/FormField'
 import WorldViewSelector from '../components/WorldViewSelector'
 import { useScrollIntoViewOnFocus } from '../hooks/useScrollIntoViewOnFocus'
 import { useAuth } from '../contexts/AuthContext'
-import { getApiUrl } from '../utils/api'
-import { getUserCharacters } from '../utils/characters'
+import { getUserCharacters, updateCharacter } from '../utils/characters'
+import { generateCharacterSecond } from '../services/characterService'
 import type { WorldView } from '../constants/worldViews'
 import type { UserInput } from '../types'
 import type { Character } from '../types'
@@ -140,80 +140,24 @@ function Create() {
     setLoadingStage('AI가 몬스터 정보를 생성하고 있습니다...')
 
     try {
-      // Firebase ID 토큰 가져오기
       if (!currentUser) {
         throw new Error('로그인이 필요합니다.')
       }
       
-      const idToken = await currentUser.getIdToken()
-      
-      // 백엔드 API 호출 (인증 토큰 포함)
-      const response = await fetch(getApiUrl('/api/ai/generate-character'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          characterId: selectedCharacterId, // 2차 생성 대상 캐릭터 ID
-          name: form.name || undefined,
-          species: form.species || undefined,
-          battleStyle: form.battleStyle || undefined,
-          appearance: form.appearance || undefined,
-          worldView: form.worldView || undefined,
-        }),
-      })
+      // 2차 캐릭터 생성 서비스 호출
+      const generatedChar = await generateCharacterSecond(
+        selectedCharacter,
+        form.name ? form.name.trim() : '',
+        form.species ? form.species.trim() : '',
+        form.battleStyle ? form.battleStyle.trim() : '',
+        form.appearance ? form.appearance.trim() : '',
+        form.worldView ? form.worldView as WorldView : selectedCharacter.worldView as WorldView
+      )
 
-      if (!response.ok) {
-        // Content-Type 확인
-        const contentType = response.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || '캐릭터 생성 실패')
-        } else {
-          // HTML 응답인 경우 (404 페이지 등)
-          const text = await response.text()
-          throw new Error(`서버 오류 (${response.status}): 백엔드 서버가 실행 중인지 확인해주세요.`)
-        }
-      }
+      setLoadingStage('완료! 저장 중...')
 
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text()
-        throw new Error('서버가 JSON이 아닌 응답을 반환했습니다. 백엔드 서버를 확인해주세요.')
-      }
-
-      setLoadingStage('이미지를 생성하고 있습니다...')
-      
-      const data = await response.json()
-      const aiData = data.character
-      
-      // 이미지 생성 상태 로깅
-      if (data.imageGeneration) {
-        console.log('🖼️ 이미지 생성 상태:', {
-          attempted: data.imageGeneration.attempted,
-          success: data.imageGeneration.success,
-          error: data.imageGeneration.error,
-          responseStructure: data.imageGeneration.responseStructure,
-        });
-        
-        if (!data.imageGeneration.success) {
-          console.warn('⚠️ 이미지 생성 실패:', data.imageGeneration.error || '알 수 없는 오류');
-        }
-      }
-      
-      // 이미지 데이터 확인 (imageUrl 우선, imageData는 fallback)
-      if (aiData.imageUrl) {
-        console.log('✅ 이미지 URL 수신 성공:', aiData.imageUrl);
-      } else if (aiData.imageData) {
-        console.log('✅ 이미지 데이터 수신 성공! 길이:', aiData.imageData.length);
-        console.log('   데이터 시작:', aiData.imageData.substring(0, 50) + '...');
-      } else {
-        console.warn('⚠️ 이미지가 없습니다. imageUrl:', aiData.imageUrl, 'imageData:', aiData.imageData);
-      }
-
-      // 백엔드에서 이미 Firestore에 저장 완료
-      // response의 character.id가 Firestore 문서 ID
+      // 캐릭터 정보 업데이트
+      await updateCharacter(currentUser.uid, selectedCharacterId, generatedChar)
 
       // 폼 초기화
       setForm({
@@ -224,8 +168,6 @@ function Create() {
         worldView: '',
       })
 
-      setLoadingStage('완료! 저장 중...')
-      
       // 잠시 대기 후 관리 탭으로 이동
       setTimeout(() => {
         navigate('/manage')
@@ -236,10 +178,6 @@ function Create() {
       
       if (error instanceof Error) {
         errorMessage = error.message
-        // 네트워크 오류인 경우
-        if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
-          errorMessage = '백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.'
-        }
       }
       
       setCreateMessage(`❌ 생성 실패: ${errorMessage}`)

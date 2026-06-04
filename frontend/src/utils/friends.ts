@@ -20,6 +20,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { checkIsMockMode } from '../services/characterService'
 
 export interface FriendRequest {
   id: string
@@ -45,12 +46,15 @@ export interface UserProfile {
 
 /**
  * 닉네임으로 사용자 검색
- * Firestore의 문자열 범위 쿼리 사용 (인덱스 필요 없음)
  */
 export async function searchUsersByNickname(nickname: string, currentUserId: string): Promise<UserProfile[]> {
+  if (checkIsMockMode()) {
+    const { searchLocalUsersByNickname } = await import('./mockDataService')
+    return searchLocalUsersByNickname(nickname, currentUserId)
+  }
+
   try {
     const profilesRef = collection(db, 'userProfiles')
-    // 정확한 일치 또는 시작 부분 일치 검색
     const q = query(
       profilesRef,
       where('nickname', '>=', nickname.toLowerCase()),
@@ -59,7 +63,7 @@ export async function searchUsersByNickname(nickname: string, currentUserId: str
     const querySnapshot = await getDocs(q)
     
     return querySnapshot.docs
-      .filter(doc => doc.id !== currentUserId) // 자기 자신 제외
+      .filter(doc => doc.id !== currentUserId)
       .map(doc => {
         const data = doc.data()
         return {
@@ -67,10 +71,9 @@ export async function searchUsersByNickname(nickname: string, currentUserId: str
           nickname: data.nickname || '',
         }
       })
-      .filter(user => user.nickname.toLowerCase().includes(nickname.toLowerCase())) // 대소문자 무시 필터링
+      .filter(user => user.nickname.toLowerCase().includes(nickname.toLowerCase()))
   } catch (error) {
     console.error('사용자 검색 실패:', error)
-    // 인덱스 오류인 경우 빈 배열 반환
     if (error instanceof Error && error.message.includes('index')) {
       console.warn('Firestore 인덱스가 필요합니다. Firebase 콘솔에서 인덱스를 생성해주세요.')
       return []
@@ -83,28 +86,30 @@ export async function searchUsersByNickname(nickname: string, currentUserId: str
  * 친구 요청 보내기
  */
 export async function sendFriendRequest(fromUserId: string, fromUserNickname: string, toUserId: string, toUserNickname: string): Promise<void> {
+  if (checkIsMockMode()) {
+    const { sendLocalFriendRequest } = await import('./mockDataService')
+    await sendLocalFriendRequest(fromUserId, fromUserNickname, toUserId, toUserNickname)
+    window.dispatchEvent(new CustomEvent('mmm-friends-changed'))
+    return
+  }
+
   try {
-    // 이미 친구인지 확인
     const isFriend = await checkFriendship(fromUserId, toUserId)
     if (isFriend) {
       throw new Error('이미 친구입니다.')
     }
     
-    // 이미 보낸 요청이 있는지 확인
     const existingSentRequest = await getFriendRequest(fromUserId, toUserId)
     if (existingSentRequest && existingSentRequest.status === 'pending') {
       throw new Error('이미 친구 요청을 보냈습니다.')
     }
     
-    // 상대방이 보낸 요청이 있는지 확인 (있으면 자동 승인)
     const existingReceivedRequest = await getFriendRequest(toUserId, fromUserId)
     if (existingReceivedRequest && existingReceivedRequest.status === 'pending') {
-      // 상대방이 보낸 요청이 있으면 자동으로 승인
       await acceptFriendRequestById(existingReceivedRequest.id)
       return
     }
     
-    // 새 친구 요청 생성 (각 요청을 별도 문서로 저장)
     const requestsRef = collection(db, 'friendRequests')
     await addDoc(requestsRef, {
       fromUserId,
@@ -138,7 +143,6 @@ async function getFriendRequest(fromUserId: string, toUserId: string): Promise<F
       return null
     }
     
-    // 가장 최근 요청 반환
     const requests = querySnapshot.docs.map(doc => {
       const data = doc.data()
       return {
@@ -164,9 +168,13 @@ async function getFriendRequest(fromUserId: string, toUserId: string): Promise<F
  * 받은 친구 요청 목록 가져오기
  */
 export async function getReceivedFriendRequests(userId: string): Promise<FriendRequest[]> {
+  if (checkIsMockMode()) {
+    const { getLocalReceivedFriendRequests } = await import('./mockDataService')
+    return getLocalReceivedFriendRequests(userId)
+  }
+
   try {
     const requestsRef = collection(db, 'friendRequests')
-    // orderBy 없이 먼저 쿼리 (인덱스 문제 방지)
     const q = query(
       requestsRef,
       where('toUserId', '==', userId),
@@ -187,9 +195,7 @@ export async function getReceivedFriendRequests(userId: string): Promise<FriendR
       }
     })
     
-    // 클라이언트에서 정렬
     requests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    
     return requests
   } catch (error) {
     console.error('받은 친구 요청 목록 가져오기 실패:', error)
@@ -201,6 +207,13 @@ export async function getReceivedFriendRequests(userId: string): Promise<FriendR
  * 친구 요청 승인
  */
 export async function acceptFriendRequestById(requestId: string): Promise<void> {
+  if (checkIsMockMode()) {
+    const { acceptLocalFriendRequestById } = await import('./mockDataService')
+    await acceptLocalFriendRequestById(requestId)
+    window.dispatchEvent(new CustomEvent('mmm-friends-changed'))
+    return
+  }
+
   try {
     const requestRef = doc(db, 'friendRequests', requestId)
     const requestDoc = await getDoc(requestRef)
@@ -213,17 +226,14 @@ export async function acceptFriendRequestById(requestId: string): Promise<void> 
     const userId1 = data.fromUserId
     const userId2 = data.toUserId
     
-    // 요청 상태 업데이트
     await updateDoc(requestRef, {
       status: 'accepted',
       acceptedAt: serverTimestamp(),
     })
     
-    // 친구 관계 생성 (양방향 체크를 위해 정렬된 ID 사용)
     const friendId = userId1 < userId2 ? `${userId1}_${userId2}` : `${userId2}_${userId1}`
     const friendRef = doc(db, 'friends', friendId)
     
-    // 이미 친구 관계가 있는지 확인
     const friendDoc = await getDoc(friendRef)
     if (!friendDoc.exists()) {
       await setDoc(friendRef, {
@@ -242,6 +252,13 @@ export async function acceptFriendRequestById(requestId: string): Promise<void> 
  * 친구 요청 거절
  */
 export async function rejectFriendRequest(requestId: string): Promise<void> {
+  if (checkIsMockMode()) {
+    const { rejectLocalFriendRequest } = await import('./mockDataService')
+    await rejectLocalFriendRequest(requestId)
+    window.dispatchEvent(new CustomEvent('mmm-friends-changed'))
+    return
+  }
+
   try {
     const requestRef = doc(db, 'friendRequests', requestId)
     await updateDoc(requestRef, {
@@ -273,6 +290,11 @@ async function checkFriendship(userId1: string, userId2: string): Promise<boolea
  * 친구 목록 가져오기
  */
 export async function getFriends(userId: string): Promise<Friend[]> {
+  if (checkIsMockMode()) {
+    const { getLocalFriends } = await import('./mockDataService')
+    return getLocalFriends(userId)
+  }
+
   try {
     const friendsRef = collection(db, 'friends')
     const q1 = query(friendsRef, where('userId1', '==', userId))
@@ -293,7 +315,6 @@ export async function getFriends(userId: string): Promise<Friend[]> {
       if (data.userId1) friendIds.push(data.userId1)
     })
     
-    // 친구 프로필 정보 가져오기
     const friends: Friend[] = []
     for (const friendId of friendIds) {
       const profileRef = doc(db, 'userProfiles', friendId)
@@ -313,7 +334,6 @@ export async function getFriends(userId: string): Promise<Friend[]> {
       }
     }
     
-    // 추가일 기준으로 정렬
     friends.sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
     
     return friends
@@ -327,12 +347,18 @@ export async function getFriends(userId: string): Promise<Friend[]> {
  * 친구 삭제
  */
 export async function removeFriend(userId1: string, userId2: string): Promise<void> {
+  if (checkIsMockMode()) {
+    const { removeLocalFriend } = await import('./mockDataService')
+    await removeLocalFriend(userId1, userId2)
+    window.dispatchEvent(new CustomEvent('mmm-friends-changed'))
+    return
+  }
+
   try {
     const friendId = userId1 < userId2 ? `${userId1}_${userId2}` : `${userId2}_${userId1}`
     const friendRef = doc(db, 'friends', friendId)
     await deleteDoc(friendRef)
     
-    // 친구 요청도 삭제 (있는 경우)
     const requestId = friendId
     const requestRef = doc(db, 'friendRequests', requestId)
     const requestDoc = await getDoc(requestRef)
@@ -352,8 +378,21 @@ export function subscribeToFriendRequests(
   userId: string,
   callback: (requests: FriendRequest[]) => void
 ): () => void {
+  if (checkIsMockMode()) {
+    const handleUpdate = async () => {
+      const { getLocalReceivedFriendRequests } = await import('./mockDataService')
+      const reqs = await getLocalReceivedFriendRequests(userId)
+      callback(reqs)
+    }
+    
+    handleUpdate()
+    window.addEventListener('mmm-friends-changed', handleUpdate)
+    return () => {
+      window.removeEventListener('mmm-friends-changed', handleUpdate)
+    }
+  }
+
   const requestsRef = collection(db, 'friendRequests')
-  // orderBy 없이 쿼리 (인덱스 문제 방지)
   const q = query(
     requestsRef,
     where('toUserId', '==', userId),
@@ -373,7 +412,6 @@ export function subscribeToFriendRequests(
         createdAt: data.createdAt?.toDate() || new Date(),
       }
     })
-    // 클라이언트에서 정렬
     requests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     callback(requests)
   })
@@ -386,6 +424,19 @@ export function subscribeToFriends(
   userId: string,
   callback: (friends: Friend[]) => void
 ): () => void {
+  if (checkIsMockMode()) {
+    const handleUpdate = async () => {
+      const friendsList = await getFriends(userId)
+      callback(friendsList)
+    }
+    
+    handleUpdate()
+    window.addEventListener('mmm-friends-changed', handleUpdate)
+    return () => {
+      window.removeEventListener('mmm-friends-changed', handleUpdate)
+    }
+  }
+
   const friendsRef = collection(db, 'friends')
   const q1 = query(friendsRef, where('userId1', '==', userId))
   const q2 = query(friendsRef, where('userId2', '==', userId))
@@ -415,6 +466,11 @@ export function subscribeToFriends(
  * 다른 사용자의 계약된 몬스터 가져오기
  */
 export async function getOtherUserContractedMonsters(userId: string) {
+  if (checkIsMockMode()) {
+    const { getLocalOtherUserContractedMonsters } = await import('./mockDataService')
+    return getLocalOtherUserContractedMonsters(userId)
+  }
+
   try {
     const { getUserCharacters } = await import('./characters')
     const allCharacters = await getUserCharacters(userId)
@@ -429,6 +485,11 @@ export async function getOtherUserContractedMonsters(userId: string) {
  * 무작위 사용자 선택 (자기 자신 제외)
  */
 export async function getRandomUser(currentUserId: string): Promise<UserProfile | null> {
+  if (checkIsMockMode()) {
+    const { getLocalRandomUser } = await import('./mockDataService')
+    return getLocalRandomUser(currentUserId)
+  }
+
   try {
     const profilesRef = collection(db, 'userProfiles')
     const querySnapshot = await getDocs(profilesRef)
@@ -451,4 +512,5 @@ export async function getRandomUser(currentUserId: string): Promise<UserProfile 
     return null
   }
 }
+
 
