@@ -1,5 +1,15 @@
 {
   "projects": {
-    "default": "my-monster-maker"
-  }
+    "default": "evenight-cloud"
+  },
+  "targets": {
+    "evenight-cloud": {
+      "hosting": {
+        "mmm-site": [
+          "evenight-mmm"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
