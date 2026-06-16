@@ -13,6 +13,9 @@ import Settings from './pages/Settings'
 import { DEFAULT_ROUTE } from './constants/tabs'
 import './App.css'
 
+import { useEffect } from 'react'
+import { trackVisitor } from './config/visitorFirebase'
+
 /**
  * 메인 App 컴포넌트
  * 라우팅과 전체 레이아웃을 관리
@@ -20,6 +23,10 @@ import './App.css'
 function App() {
   // 폰트 크기 설정 적용 (html font-size 변경)
   useFontSize()
+
+  useEffect(() => {
+    trackVisitor()
+  }, [])
 
   return (
     <div className="w-full h-screen h-[100dvh] flex flex-col relative overflow-hidden cosmic-bg">
