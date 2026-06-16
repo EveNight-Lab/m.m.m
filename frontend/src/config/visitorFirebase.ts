@@ -17,13 +17,40 @@ const visitorApp = getApps().find(app => app.name === 'visitor_tracker')
 
 const visitorDb = getFirestore(visitorApp);
 
+const getKstDateStrings = () => {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')?.value || '2026';
+  const month = parts.find(p => p.type === 'month')?.value || '01';
+  const day = parts.find(p => p.type === 'day')?.value || '01';
+  return {
+    dailyKey: `${year}-${month}-${day}`,
+    monthlyKey: `${year}-${month}`
+  };
+};
+
 export const trackVisitor = async () => {
   const sessionKey = 'evenight_visit_tracked_mymonstermaker';
   if (sessionStorage.getItem(sessionKey)) return;
 
   try {
-    const docRef = doc(visitorDb, 'site_stats', 'my-monster-maker');
-    await setDoc(docRef, { visit_count: increment(1) }, { merge: true });
+    const { dailyKey, monthlyKey } = getKstDateStrings();
+    const docRefTotal = doc(visitorDb, 'site_stats', 'my-monster-maker');
+    const docRefDaily = doc(visitorDb, 'site_stats', `my-monster-maker_daily_${dailyKey}`);
+    const docRefMonthly = doc(visitorDb, 'site_stats', `my-monster-maker_monthly_${monthlyKey}`);
+
+    await Promise.all([
+      setDoc(docRefTotal, { visit_count: increment(1) }, { merge: true }),
+      setDoc(docRefDaily, { visit_count: increment(1) }, { merge: true }),
+      setDoc(docRefMonthly, { visit_count: increment(1) }, { merge: true })
+    ]);
+
     sessionStorage.setItem(sessionKey, 'true');
   } catch (error) {
     console.error("Failed to track visitor count:", error);
