@@ -1,9 +1,10 @@
-import { ReactNode } from 'react'
+import { ReactNode } from "react";
+import Footer from "./Footer";
 
 interface PageLayoutProps {
-  title: string
-  subtitle?: string
-  children: ReactNode
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
 }
 
 /**
@@ -26,9 +27,9 @@ function PageLayout({ title, subtitle, children }: PageLayoutProps) {
         </h1>
       )}
       {children}
+      <Footer />
     </div>
-  )
+  );
 }
 
-export default PageLayout
-
+export default PageLayout;
