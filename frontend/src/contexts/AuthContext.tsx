@@ -146,10 +146,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { searchLocalUsersByNickname } = await import('../utils/mockDataService')
       // 검색 시 자신을 제외하므로 더미 닉네임 일치를 위해 전체 스토리지 확인
       const profiles = JSON.parse(localStorage.getItem('mmm_user_profiles') || '{}')
-      const profile = Object.values(profiles).find((p: any) => p.nickname.toLowerCase() === trimmedNickname.toLowerCase()) as any
+      let profile = Object.values(profiles).find((p: any) => p.nickname.toLowerCase() === trimmedNickname.toLowerCase()) as any
       
       if (!profile) {
-        throw new Error('존재하지 않는 닉네임입니다.')
+        // 온더플라이로 가짜 유저 프로필 자동 생성
+        const uid = 'mock_user_' + Date.now()
+        profile = { userId: uid, nickname: trimmedNickname }
+        profiles[uid] = profile
+        localStorage.setItem('mmm_user_profiles', JSON.stringify(profiles))
       }
 
       const fakeUser = {

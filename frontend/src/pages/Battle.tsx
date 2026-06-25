@@ -23,6 +23,16 @@ import DamageSummationDisplay from '../components/DamageSummationDisplay'
 import { checkCombo } from '../utils/battleEngine'
 import { addInjury } from '../utils/injurySystem'
 import Dice3DScene from '../components/Dice3D'
+import Dice2DScene from '../components/Dice2DScene'
+
+function isWebGLAvailable() {
+  try {
+    const canvas = document.createElement('canvas')
+    return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')))
+  } catch (e) {
+    return false
+  }
+}
 
 type BattleMode = 'select' | 'normal' | 'friend' | 'battling'
 
@@ -35,6 +45,7 @@ function Battle() {
   const [selectedEnemy, setSelectedEnemy] = useState<Character | null>(null)
   const [enemyId, setEnemyId] = useState<string>('') // 특정 적 ID 입력
   const [isMatching, setIsMatching] = useState(false) // 매칭 중 상태
+  const [use3DDice, setUse3DDice] = useState(() => isWebGLAvailable())
   const [playerAction, setPlayerAction] = useState<'attacking' | 'hit' | 'miss' | 'damaged' | 'defended' | null>(null)
   const [enemyAction, setEnemyAction] = useState<'attacking' | 'hit' | 'miss' | 'damaged' | 'defended' | null>(null)
   const [lastDamage, setLastDamage] = useState<{ damage: number; target: 'player' | 'enemy'; isCritical: boolean } | null>(null) // 마지막 데미지
@@ -123,16 +134,16 @@ function Battle() {
     setDiceList(newDiceList)
   }, [battleState?.state, battleState?.turn])
   
-  // 주사위 굴리기 (전투 턴 시작 시)
-  useEffect(() => {
-    if (battleState?.state === 'attacking' && diceList.length > 0 && rollAllDiceRef.current) {
-      // 약간의 딜레이 후 주사위 굴리기 (startDiceRoll은 processTurn에서 이미 호출됨)
-      const timer = setTimeout(() => {
-        rollAllDiceRef.current?.()
-      }, 300)
-      return () => clearTimeout(timer)
-    }
-  }, [battleState?.state, diceList.length])
+  // 주사위 굴리기 준비 완료 시 처리
+  const handleRollAllReady = (rollAll: () => void) => {
+    rollAllDiceRef.current = rollAll
+    // 약간의 딜레이 후 주사위 굴리기 (startDiceRoll은 processTurn에서 이미 호출됨)
+    setTimeout(() => {
+      if (rollAllDiceRef.current === rollAll) {
+        rollAll()
+      }
+    }, 300)
+  }
   
   // 주사위 결과 처리
   const handleDiceRoll = (diceId: string, result: number) => {
@@ -265,6 +276,51 @@ function Battle() {
       isApplyingRef.current = false
     }
   }, [battleState?.state])
+
+  // 즉시 주사위 굴리기 (3D 생략 및 폴백)
+  const handleInstantRoll = useCallback(() => {
+    if (!battleState || battleState.state !== 'attacking' || diceList.length === 0) return
+    
+    console.log('[Battle] handleInstantRoll 실행')
+    
+    const attacker = battleState.turn % 2 === 0 ? 'player' : 'enemy'
+    const attackerChar = attacker === 'player' ? battleState.player : battleState.enemy
+    const specialDiceValue = attackerChar.nextTurnEffects?.specialDice
+    
+    const results = diceList.map(() => {
+      return specialDiceValue !== undefined ? specialDiceValue : Math.floor(Math.random() * 6) + 1
+    })
+    
+    console.log('[Battle] handleInstantRoll 생성된 결과:', results)
+    
+    const resultKey = `turn-${battleState.turn}-attacking`
+    if (appliedResultsRef.current === resultKey) return
+    
+    isApplyingRef.current = true
+    appliedResultsRef.current = resultKey
+    
+    setDiceResults(new Map())
+    
+    const processingKey = `turn-${battleState.turn}-${attacker}`
+    diceDisplayProcessingRef.current = processingKey
+    
+    setDiceDisplay({
+      diceResults: results,
+      position: { x: 0, y: 0 },
+      attacker,
+    })
+  }, [battleState, diceList])
+
+  // 3D 주사위가 4초 동안 반응이 없거나 WebGL 미지원 시 자동으로 즉시 굴리기 수행 (폴백)
+  useEffect(() => {
+    if (battleState?.state === 'attacking') {
+      const timer = setTimeout(() => {
+        console.log('[Battle] 3D 주사위 응답 지연으로 인한 자동 즉시 굴리기 실행')
+        handleInstantRoll()
+      }, 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [battleState?.state, battleState?.turn, handleInstantRoll])
   
   useEffect(() => {
     // attacking 상태가 아니면 실행하지 않음
@@ -658,6 +714,21 @@ function Battle() {
               </button>
             </Card>
           </div>
+
+          <Card>
+            <div className="p-4 flex items-center justify-between bg-black/40 border border-cyan-500/20 rounded-lg">
+              <div>
+                <h3 className="font-bold text-sm text-cyan-400">3D 주사위 연출 사용</h3>
+                <p className="text-xs text-gray-400">비활성화 시 가볍고 빠른 2D 주사위로 대체됩니다 (WebGL 오류/렉 발생 시 권장)</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={use3DDice}
+                onChange={(e) => setUse3DDice(e.target.checked)}
+                className="w-5 h-5 rounded border-gray-600 text-cyan-500 focus:ring-cyan-500 bg-gray-800 cursor-pointer"
+              />
+            </div>
+          </Card>
         </div>
       </PageLayout>
     )
@@ -776,6 +847,17 @@ function Battle() {
         {battleState && (battleState.state === 'fighting' || battleState.state === 'attacking') && (
           <Card>
             <div className="space-y-4">
+              {/* 3D 생략 버튼 */}
+              {battleState.state === 'attacking' && (
+                <div className="flex justify-center z-50 relative">
+                  <button
+                    onClick={handleInstantRoll}
+                    className="px-4 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500/50 rounded-full text-xs font-bold text-yellow-300 animate-pulse transition-all duration-200"
+                  >
+                    🎲 즉시 결과 확인 (3D 생략)
+                  </button>
+                </div>
+              )}
               {/* 전투 장면 - 반응형 레이아웃 (넓으면 좌우, 좁으면 상하) */}
               <div className="relative flex flex-col md:flex-row items-center justify-around gap-2 md:gap-4 bg-gradient-to-b from-purple-900/20 via-blue-900/20 to-purple-900/20 rounded-lg p-2 md:p-4 border-2 border-cyan-500/30 overflow-visible" style={{ minHeight: 'calc(100vh - 250px)', maxHeight: 'calc(100vh - 200px)' }}>
                 {/* 데미지 계산 연출 (기존 호환성 유지) */}
@@ -799,16 +881,25 @@ function Battle() {
                       battleState.state === 'attacking' && 
                       battleState.turn % 2 === 0 && 
                       diceList.length > 0 ? (
-                        <Dice3DScene
-                          diceList={diceList}
-                          onDiceRoll={handleDiceRoll}
-                          onRollAllReady={(rollAll) => {
-                            rollAllDiceRef.current = rollAll
-                          }}
-                          attackerChar={battleState.player.character}
-                          overlayMode={true}
-                          specialDiceValue={battleState.player.nextTurnEffects?.specialDice}
-                        />
+                        use3DDice ? (
+                          <Dice3DScene
+                            diceList={diceList}
+                            onDiceRoll={handleDiceRoll}
+                            onRollAllReady={handleRollAllReady}
+                            attackerChar={battleState.player.character}
+                            overlayMode={true}
+                            specialDiceValue={battleState.player.nextTurnEffects?.specialDice}
+                          />
+                        ) : (
+                          <Dice2DScene
+                            diceList={diceList}
+                            onDiceRoll={handleDiceRoll}
+                            onRollAllReady={handleRollAllReady}
+                            attackerChar={battleState.player.character}
+                            overlayMode={true}
+                            specialDiceValue={battleState.player.nextTurnEffects?.specialDice}
+                          />
+                        )
                       ) : undefined
                     }
                     diceDisplay={
@@ -853,16 +944,25 @@ function Battle() {
                       battleState.state === 'attacking' && 
                       battleState.turn % 2 === 1 && 
                       diceList.length > 0 ? (
-                        <Dice3DScene
-                          diceList={diceList}
-                          onDiceRoll={handleDiceRoll}
-                          onRollAllReady={(rollAll) => {
-                            rollAllDiceRef.current = rollAll
-                          }}
-                          attackerChar={battleState.enemy.character}
-                          overlayMode={true}
-                          specialDiceValue={battleState.enemy.nextTurnEffects?.specialDice}
-                        />
+                        use3DDice ? (
+                          <Dice3DScene
+                            diceList={diceList}
+                            onDiceRoll={handleDiceRoll}
+                            onRollAllReady={handleRollAllReady}
+                            attackerChar={battleState.enemy.character}
+                            overlayMode={true}
+                            specialDiceValue={battleState.enemy.nextTurnEffects?.specialDice}
+                          />
+                        ) : (
+                          <Dice2DScene
+                            diceList={diceList}
+                            onDiceRoll={handleDiceRoll}
+                            onRollAllReady={handleRollAllReady}
+                            attackerChar={battleState.enemy.character}
+                            overlayMode={true}
+                            specialDiceValue={battleState.enemy.nextTurnEffects?.specialDice}
+                          />
+                        )
                       ) : undefined
                     }
                     diceDisplay={

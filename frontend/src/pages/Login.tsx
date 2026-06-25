@@ -79,6 +79,20 @@ function Login() {
     }
   }
 
+  const handleGuestLogin = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await login('제미나이마스터', '123456')
+      navigate('/manage')
+    } catch (err: any) {
+      setError(err.message || '오류가 발생했습니다.')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <PageLayout title={isLogin ? '로그인' : '회원가입'}>
       <div className="max-w-md mx-auto">
@@ -164,6 +178,17 @@ function Login() {
             >
               {loading ? '처리 중...' : isLogin ? '로그인' : '회원가입 시작하기'}
             </button>
+
+            {isLogin && (
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                disabled={loading}
+                className="w-full p-3 rounded-lg font-semibold transition-all bg-gradient-to-r from-purple-500/35 to-cyan-500/35 hover:from-purple-500/50 hover:to-cyan-500/50 border border-purple-500/50 text-white shadow-[0_4px_20px_rgba(168,85,247,0.25)] hover:shadow-[0_4px_25px_rgba(168,85,247,0.45)] mt-2"
+              >
+                로그인 없이 시작하기 (게스트)
+              </button>
+            )}
 
             <div className="pt-4 border-t border-white/10">
               <div className="text-center text-sm text-gray-400 mb-2">

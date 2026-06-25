@@ -194,6 +194,7 @@ export function useContractGame(
   const cycleCountRef = useRef(0)
   const lastTimestampRef = useRef<number | null>(null)
   const accumulatedDistanceRef = useRef(0) // 누적 이동 거리 (0~100% 사이)
+  const dynamicBarSpeedRef = useRef<number>(config.barSpeed)
 
   // 타이밍 바 애니메이션 (시간 기반 정확한 계산으로 무한 회전)
   // 자동 감소량이 증가할수록 바 속도도 증가
@@ -219,8 +220,12 @@ export function useContractGame(
 
     const animate = (timestamp: number) => {
       // 이전 프레임과의 시간 차이 계산
-      const lastTimestamp = lastTimestampRef.current || startTimeRef.current
-      const deltaTime = timestamp - lastTimestamp
+      if (lastTimestampRef.current === null) {
+        lastTimestampRef.current = timestamp
+        animationFrameRef.current = requestAnimationFrame(animate)
+        return
+      }
+      const deltaTime = timestamp - lastTimestampRef.current
       lastTimestampRef.current = timestamp
       
       // 기본 barSpeed (전체 구간을 지나가는 데 걸리는 시간, 밀리초)
@@ -241,10 +246,11 @@ export function useContractGame(
       const passiveLoss = baseLoss * cycleMultiplier
       
       // 자동 감소량이 증가할수록 바 속도 증가 (barSpeed 감소 = 속도 증가)
-      // 속도 증가량을 다시 절반으로 줄임 (0.075 -> 0.0375)
+      // 난이도 상승에 따른 속도 증가를 완화하여 예측 가능한 리듬 유지 (최대 15%만 증가)
       const lossMultiplier = passiveLoss / baseLoss // 감소량 배수
-      const speedReduction = Math.min(0.5, (lossMultiplier - 1) * 0.0375) // 최대 50% 감소 (최대 2배 빠르게), 증가량 1/4
+      const speedReduction = Math.min(0.15, (lossMultiplier - 1) * 0.01)
       const dynamicBarSpeed = baseBarSpeed * (1 - speedReduction)
+      dynamicBarSpeedRef.current = dynamicBarSpeed
       
       // 속도 변화에 따른 거리 증가 (deltaTime 동안 이동한 거리)
       const distancePerMs = 100 / dynamicBarSpeed // 1ms당 이동 거리 (%)
@@ -283,69 +289,51 @@ export function useContractGame(
   }, [gameState, config.barSpeed, config.barWidth, config.failureLoss, config.targetZones])
 
   // 판정: 바가 타겟 구간 안에 있는지 확인하고 성공한 존의 인덱스 반환
-  // ref를 사용하여 클릭 시점의 정확한 위치를 캡처
+  // ref(마지막 프레임 시뮬레이션)와 state(마지막 렌더링 화면)를 모두 확인하고, 반응 지연 보정을 위한 lookback 버퍼 검사 적용
   const checkHit = useCallback((): number | null => {
-    // ref에서 정확한 위치 가져오기 (클릭 시점의 실제 위치)
-    const pointerPos = barPositionRef.current
+    const pointerPosRef = barPositionRef.current
+    const pointerPosState = barPosition
+    const currentSpeed = dynamicBarSpeedRef.current || config.barSpeed
+
+    // 반응 속도 보정 (180ms 정도의 유저 반응 속도 및 입력 지연 보정)
+    const reactionTimeMs = 180
+    const reactionOffset = (reactionTimeMs / currentSpeed) * 100
 
     for (let i = 0; i < targetZones.length; i += 2) {
       const zoneStart = targetZones[i]
       const zoneEnd = targetZones[i + 1]
 
-      // 경계값 포함하여 판정
-      // 원형 UI에서는 포인터(한 점) 기준으로 판정
-      // 빠르게 움직이는 바와 렌더링 지연을 고려하여 약간의 여유를 둠
-      // 바의 속도에 따라 tolerance를 동적으로 조정
-      const baseBarSpeed = Math.max(500, Math.min(5000, config.barSpeed))
-      const speedFactor = 5000 / baseBarSpeed // 빠를수록 큰 값 (1~10)
-      const baseTolerance = 0.15 // 기본 여유 0.15%
-      const tolerance = baseTolerance * (1 + speedFactor * 0.1) // 속도에 비례하여 여유 증가 (최대 0.3%)
+      // 사용자가 시각적으로 인식하고 누른 위치의 오차 보정 (4% 여유)
+      const tolerance = 4.0
       
-      // 포인터가 존 안에 있는지 확인 (경계 포함)
-      // 빠르게 움직일 때를 고려하여 약간의 여유를 둠
-      if (pointerPos >= zoneStart - tolerance && pointerPos <= zoneEnd + tolerance) {
+      // 현재 포인터 위치와 반응 속도를 고려한 과거 위치들 검사 (과거 궤적 보간)
+      const pointsToCheck = [
+        pointerPosRef,
+        pointerPosState,
+        (pointerPosRef - reactionOffset * 0.2 + 100) % 100,
+        (pointerPosRef - reactionOffset * 0.4 + 100) % 100,
+        (pointerPosRef - reactionOffset * 0.6 + 100) % 100,
+        (pointerPosRef - reactionOffset * 0.8 + 100) % 100,
+        (pointerPosRef - reactionOffset + 100) % 100,
+        (pointerPosState - reactionOffset * 0.25 + 100) % 100,
+        (pointerPosState - reactionOffset * 0.5 + 100) % 100,
+        (pointerPosState - reactionOffset * 0.75 + 100) % 100,
+        (pointerPosState - reactionOffset + 100) % 100,
+      ]
+
+      const isHit = pointsToCheck.some(p => p >= zoneStart - tolerance && p <= zoneEnd + tolerance)
+
+      if (isHit) {
         return i // 성공한 존의 시작 인덱스 반환
       }
     }
 
     return null // 실패
-  }, [targetZones])
+  }, [targetZones, barPosition, config.barSpeed])
 
   // 버튼 클릭 핸들러
   const handleClick = useCallback(() => {
     if (gameState !== 'playing') return
-
-    // 클릭 시점의 정확한 위치 계산 (애니메이션 프레임과의 동기화 문제 해결)
-    // 현재 시간을 기준으로 정확한 위치를 계산
-    if (startTimeRef.current > 0 && lastTimestampRef.current) {
-      const currentTime = performance.now()
-      const elapsedTime = currentTime - startTimeRef.current
-      
-      // 기본 barSpeed 계산
-      const baseBarSpeed = Math.max(500, Math.min(5000, config.barSpeed))
-      const baseLoss = Math.max(0.5, config.failureLoss * 0.2)
-      const zoneCount = config.targetZones
-      let cycleMultiplierRate: number
-      if (zoneCount === 1) {
-        cycleMultiplierRate = 0.3
-      } else if (zoneCount === 2) {
-        cycleMultiplierRate = 0.5
-      } else {
-        cycleMultiplierRate = 0.5
-      }
-      const cycleMultiplier = 1 + (cycleCountRef.current * cycleMultiplierRate)
-      const passiveLoss = baseLoss * cycleMultiplier
-      const lossMultiplier = passiveLoss / baseLoss
-      const speedReduction = Math.min(0.5, (lossMultiplier - 1) * 0.0375)
-      const dynamicBarSpeed = baseBarSpeed * (1 - speedReduction)
-      
-      // 경과 시간을 기준으로 정확한 위치 계산
-      const distancePerMs = 100 / dynamicBarSpeed
-      const exactPosition = (elapsedTime * distancePerMs) % 100
-      
-      // ref 업데이트 (정확한 위치로)
-      barPositionRef.current = exactPosition
-    }
 
     const hitZoneIndex = checkHit()
 

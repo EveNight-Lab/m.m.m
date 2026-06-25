@@ -5,6 +5,7 @@
 
 import type { Character, Trait, ActiveSkill } from '../types'
 import { WorldView } from '../constants/worldViews'
+import { getFallbackTemplatesByWorldView } from '../constants/fallbackTemplates'
 
 const TRAIT_NAMES = {
   hp: ['질긴 생명력', '바위의 단단함', '불굴의 의지', '재생의 기운', '거인의 심장', '차원 장벽'],
@@ -123,6 +124,14 @@ export function generateMockCharacterFirst(
     defense: DEFAULT_STATS.defense + traits.filter(t => t.stat === 'defense').reduce((sum, t) => sum + t.value, 0),
   }
 
+  let imageUrl = templateImageUrl
+  if (!imageUrl) {
+    const templates = getFallbackTemplatesByWorldView(worldView)
+    if (templates.length > 0) {
+      imageUrl = templates[Math.floor(Math.random() * templates.length)].imageUrl
+    }
+  }
+
   return {
     name: name.trim(),
     species: classification,
@@ -134,7 +143,7 @@ export function generateMockCharacterFirst(
     activeSkill,
     createdAt: new Date().toISOString(),
     contracted: false,
-    imageUrl: templateImageUrl
+    imageUrl: imageUrl
   }
 }
 
@@ -212,6 +221,14 @@ export function generateMockCharacterSecond(
     defense: DEFAULT_STATS.defense + finalTraits.filter(t => t.stat === 'defense').reduce((sum, t) => sum + t.value, 0),
   }
 
+  let finalImageUrl = existingCharacter?.imageUrl || null
+  if (!finalImageUrl) {
+    const templates = getFallbackTemplatesByWorldView(finalWorldView)
+    if (templates.length > 0) {
+      finalImageUrl = templates[Math.floor(Math.random() * templates.length)].imageUrl
+    }
+  }
+
   return {
     name: finalName,
     nickname: finalNickname,
@@ -224,6 +241,6 @@ export function generateMockCharacterSecond(
     activeSkill: finalActiveSkill,
     createdAt: existingCharacter?.createdAt || new Date().toISOString(),
     contracted: existingCharacter?.contracted || false,
-    imageUrl: existingCharacter?.imageUrl || null
+    imageUrl: finalImageUrl
   }
 }
