@@ -25,7 +25,7 @@ function Footer() {
             <span>evenight331@gmail.com</span>
           </a>
           <a
-            href="https://lab.evenight.dev"
+            href="https://evenight.net"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-white transition-colors flex items-center gap-1 font-semibold"
